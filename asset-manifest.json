@@ -1,0 +1,22 @@
+{
+  "files": {
+    "main.css": "/first-issues/static/css/main.5f361e03.chunk.css",
+    "main.js": "/first-issues/static/js/main.af84a7cb.chunk.js",
+    "main.js.map": "/first-issues/static/js/main.af84a7cb.chunk.js.map",
+    "runtime-main.js": "/first-issues/static/js/runtime-main.0a9fea3f.js",
+    "runtime-main.js.map": "/first-issues/static/js/runtime-main.0a9fea3f.js.map",
+    "static/js/2.f4e0bc8c.chunk.js": "/first-issues/static/js/2.f4e0bc8c.chunk.js",
+    "static/js/2.f4e0bc8c.chunk.js.map": "/first-issues/static/js/2.f4e0bc8c.chunk.js.map",
+    "index.html": "/first-issues/index.html",
+    "precache-manifest.94736ec6821ac4b5f3add9b7b2881e9a.js": "/first-issues/precache-manifest.94736ec6821ac4b5f3add9b7b2881e9a.js",
+    "service-worker.js": "/first-issues/service-worker.js",
+    "static/css/main.5f361e03.chunk.css.map": "/first-issues/static/css/main.5f361e03.chunk.css.map",
+    "static/js/2.f4e0bc8c.chunk.js.LICENSE.txt": "/first-issues/static/js/2.f4e0bc8c.chunk.js.LICENSE.txt"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.0a9fea3f.js",
+    "static/js/2.f4e0bc8c.chunk.js",
+    "static/css/main.5f361e03.chunk.css",
+    "static/js/main.af84a7cb.chunk.js"
+  ]
+}
