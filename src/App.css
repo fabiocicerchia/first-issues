@@ -36,3 +36,17 @@
     transform: rotate(360deg);
   }
 }
+
+.MuiBadge-badge {
+  font-size: 0.6rem;
+  background-color: grey;
+}
+
+.MuiDrawer-paper {
+  width: 25%;
+  padding: 1rem;
+}
+
+.MuiBadge-anchorOriginTopRightRectangle {
+  transform: scale(1) translate(70%, -70%) !important;
+}

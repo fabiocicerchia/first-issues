@@ -1,87 +1,110 @@
 import React, { Component } from "react";
 import axios from "axios";
-import PropTypes from 'prop-types';
+import styles from "./styles.js";
+import PropTypes from "prop-types";
 import {
   Accordion,
-  AccordionDetails,
   AccordionSummary,
   Avatar,
   Badge,
-  Chip,
   Grid,
   Typography,
-} from '@material-ui/core';
-import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
-import StarIcon from '@material-ui/icons/Star';
-import CallSplitIcon from '@material-ui/icons/CallSplit';
-import BugReportIcon from '@material-ui/icons/BugReport';
-import QuestionAnswerIcon from '@material-ui/icons/QuestionAnswer';
-import VisibilityIcon from '@material-ui/icons/Visibility';
-import LibraryBooksIcon from '@material-ui/icons/LibraryBooks';
-import { withStyles } from '@material-ui/styles';
-
-const styles = theme => ({
-  root: {
-    flexGrow: 1,
-  },
-  badge: {
-    margin: '1rem',
-    display: 'inline-block',
-    fontSize: 'small',
-  },
-  issueTitle: {
-    width: '85%',
-  },
-  right: {
-    marginLeft: 'auto',
-  },
-  topLabels: {
-    margin: '0.1rem',
-    cursor: 'pointer',
-  },
-  backdrop: {
-    //zIndex: theme.zIndex.drawer + 1,
-    //color: '#fff',
-  },
-  heading: {
-  },
-});
+  Tooltip,
+} from "@material-ui/core";
+import StarIcon from "@material-ui/icons/Star";
+import CallSplitIcon from "@material-ui/icons/CallSplit";
+import BugReportIcon from "@material-ui/icons/BugReport";
+import QuestionAnswerIcon from "@material-ui/icons/QuestionAnswer";
+import VisibilityIcon from "@material-ui/icons/Visibility";
+import { withStyles } from "@material-ui/styles";
 
 class ScrollComponent extends Component {
+  constructor(props) {
+    super();
+
+    this.state = {
+      data:     [],
+      ready:    false,
+      label:    props.label || "",
+      projects: props.projects || "",
+      starred:  props.starred || {},
+      loading:  false,
+      ghtoken:  false,
+      page:     0,
+      prevY:    0,
+      cancelTokenSource: undefined,
+    };
+  }
+
   static propTypes = {
     classes: PropTypes.object.isRequired,
-    labels: PropTypes.object.isRequired,
+    label: PropTypes.string.isRequired,
+    projects: PropTypes.string.isRequired,
+    ghtoken: PropTypes.string.isRequired,
+    starred: PropTypes.object.isRequired,
   };
-  constructor() {
-    super();
-    this.state = {
-      data: [],
-      loading: false,
-      page: 0,
-      prevY: 0
-    };
+
+  static getDerivedStateFromProps(nextProps, prevState){
+    if (
+      nextProps.label !== prevState.label
+      || nextProps.projects !== prevState.projects
+      || nextProps.starred !== prevState.starred
+      || nextProps.ready !== prevState.ready
+      || nextProps.ghtoken !== prevState.ghtoken
+    ) {
+      return {
+        label:    nextProps.label,
+        projects: nextProps.projects,
+        starred:  nextProps.starred,
+        ready:    nextProps.ready,
+        ghtoken:  nextProps.ghtoken,
+      };
+    }
+    else return null;
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (
+      this.props.label !== prevProps.label
+      || this.props.projects !== prevProps.projects
+      || this.props.starred !== prevProps.starred
+      || this.props.ready !== prevProps.ready
+      || this.props.ghtoken !== prevProps.ghtoken
+    ) {
+      this.setState(state => ({ ...state,
+          label:    this.props.label,
+          projects: this.props.projects,
+          starred:  this.props.starred,
+          ready:    this.props.ready,
+          ghtoken:  this.props.ghtoken,
+        }),
+        () => {
+          if (this.props.ready) {
+            this.getData(this.state.page);
+          }
+        }
+      );
+    }
   }
 
   handleObserver(entities, observer) {
     const y = entities[0].boundingClientRect.y;
-    if (this.state.prevY > y) {
+    if (this.state.data.length > 0 && this.state.prevY > y) {
       const lastItem = this.state.data[this.state.data.length - 1];
       const curPage = lastItem.page;
       this.getData(curPage+1);
-      this.setState({ page: curPage+1 });
+      this.setState(state => ({ ...state, page: curPage+1 }));
     }
-    this.setState({ prevY: y });
+    this.setState(state => ({ ...state, prevY: y }));
   }
 
   componentDidMount() {
-    this.getData(this.state.page);
-
     var options = {
-      root: null,
+      root:       null,
       rootMargin: "0px",
-      threshold: 1.0
+      threshold:  1.0
     };
-    
+
     this.observer = new IntersectionObserver(
       this.handleObserver.bind(this),
       options
@@ -90,42 +113,69 @@ class ScrollComponent extends Component {
   }
 
   getData(page) {
-    this.setState({ loading: true });
+    if (this.state.ghtoken === "" || this.state.ghtoken === null) return;
+    
+    this.setState(state => ({ ...state, loading: true }));
 
-    const query = 'state%3Aopen+'+this.props.labels.map(x => encodeURIComponent("label: "+x)).join('+');
-    const sort = 'updated';
-    const order = 'desc';
+    const query = [
+      encodeURIComponent("is:issue"),
+      encodeURIComponent("state:open"),
+      encodeURIComponent("label:\""+this.state.label+"\""),
+      this.state.projects.split(/ /).map(x => encodeURIComponent("repo:")+x).join("+"),
+    ].join("+");
+    const sort = "updated";
+    const order = "desc";
 
     const url = `https://api.github.com/search/issues?q=${query}&sort=${sort}&order=${order}&per_page=100&page=${page}`;
+
+    if (this.state.cancelTokenSource) {
+      this.state.cancelTokenSource.cancel();
+    }
+    let axiosToken = axios.CancelToken.source();
+    this.setState(state => ({ ...state,
+      cancelTokenSource: axiosToken,
+    }));
+
     axios
-      .get(url)
+      .get(url, {
+        cancelToken: axiosToken.token,
+        headers: {
+          "Authorization": `token ${this.state.ghtoken}`,
+        }
+      })
+      .catch(function (thrown) {
+        if (axios.isCancel(thrown)) {
+          console.log("Request canceled", thrown.message);
+        }
+      })
       .then(res => {
+        if (res === undefined) return;
         var issues = [];
-        
+        var starred = this.state.starred;
+
         res.data.items.forEach(function(item) {
           let project = item.repository_url.replace(/https:\/\/api.github.com\/repos\//, "")
           issues.push({
-            page: page,
-            title: item.title,
-            details: item.body,
-            link: item.html_url,
-            project: project,
-            logo: project[0].toUpperCase(),
-            //stars: 12,
-            //forks: 12,
-            //issues: 12,
-            //pullrequests: 12,
+            page:     page,
+            title:    item.title,
+            details:  item.body,
+            link:     item.html_url,
+            project:  project,
+            logo:     typeof starred[project] !== "undefined" ? starred[project].logo : project[0].toUpperCase(),
+            stars:    typeof starred[project] !== "undefined" ? starred[project].stargazers_count : undefined,
+            forks:    typeof starred[project] !== "undefined" ? starred[project].forks : undefined,
+            issues:   typeof starred[project] !== "undefined" ? starred[project].open_issues_count : undefined,
             comments: item.comments,
-            //watchers: 12,
+            watchers: typeof starred[project] !== "undefined" ? starred[project].watchers : undefined,
           });
         });
-        
-        this.setState({
-          total: res.data.total_count,
-          data: [...this.state.data, ...issues]
-        });
 
-        this.setState({ loading: false });
+        this.setState(state => ({ ...state,
+          total: res.data.total_count,
+          data:  [...this.state.data, ...issues]
+        }));
+
+        this.setState(state => ({ ...state, loading: false }));
       });
   }
 
@@ -147,40 +197,32 @@ class ScrollComponent extends Component {
           {this.state.data.map((item, i) => {
             return (<Accordion key={i}>
               <AccordionSummary
-                expandIcon={<ExpandMoreIcon />}
-                aria-controls="panel1a-content"
-                id="panel1a-header"
               >
                   <Grid container className={classes.root} spacing={1}>
                     <Grid item>
-                        <Avatar alt={item.project} src={item.logo} />
+                        <Tooltip title={item.project}>
+                          <Avatar alt={item.project} src={item.logo} />
+                        </Tooltip>
                     </Grid>
                     <Grid item className={classes.issueTitle}>
-                      <Typography className={classes.heading}>
-                        [{item.project}] {item.title}
+                      <Typography onClick={()=> window.open(item.link, "_blank")}>
+                        {item.title}
                       </Typography>
                     </Grid>
                     <Grid item className={classes.right}>
-                        {/*<Badge badgeContent={item.stars} color="primary" className={classes.badge}><StarIcon fontSize="small" /></Badge>*/}
-                        {/*<Badge badgeContent={item.forks} color="primary" className={classes.badge}><CallSplitIcon fontSize="small" /></Badge>*/}
-                        {/*<Badge badgeContent={item.issues} color="primary" className={classes.badge}><BugReportIcon fontSize="small" /></Badge>*/}
-                        {/*<Badge badgeContent={item.pullrequests} color="primary" className={classes.badge}><LibraryBooksIcon fontSize="small" /></Badge>*/}
-                        <Badge badgeContent={item.comments} color="primary" className={classes.badge}><QuestionAnswerIcon fontSize="small" /></Badge>
-                        {/*<Badge badgeContent={item.watchers} color="primary" className={classes.badge}><VisibilityIcon fontSize="small" /></Badge>*/}
+                        <Tooltip title="Stars"><Badge showZero badgeContent={item.stars} color="primary" className={classes.badge}><StarIcon fontSize="small" /></Badge></Tooltip>
+                        <Tooltip title="Forks"><Badge showZero badgeContent={item.forks} color="primary" className={classes.badge}><CallSplitIcon fontSize="small" /></Badge></Tooltip>
+                        <Tooltip title="Total Issues"><Badge showZero badgeContent={item.issues} color="primary" className={classes.badge}><BugReportIcon fontSize="small" /></Badge></Tooltip>
+                        {/*<Tooltip title="PRs"><Badge showZero badgeContent={item.pullrequests} color="primary" className={classes.badge}><LibraryBooksIcon fontSize="small" /></Badge></Tooltip>*/}
+                        <Tooltip title="# Comments"><Badge showZero badgeContent={item.comments} color="primary" className={classes.badge}><QuestionAnswerIcon fontSize="small" /></Badge></Tooltip>
+                        <Tooltip title="# Watches"><Badge showZero badgeContent={item.watchers} color="primary" className={classes.badge}><VisibilityIcon fontSize="small" /></Badge></Tooltip>
                     </Grid>
                   </Grid>
               </AccordionSummary>
-              <AccordionDetails>
-                <Typography>{item.details}</Typography>
-                <Typography>{item.link}</Typography>
-              </AccordionDetails>
             </Accordion>)
           })}
         </div>
-        <div
-          ref={loadingRef => (this.loadingRef = loadingRef)}
-          style={loadingCSS}
-        >
+        <div ref={loadingRef => (this.loadingRef = loadingRef)} style={loadingCSS}>
           <span style={loadingTextCSS}>Loading...</span>
         </div>
       </div>
